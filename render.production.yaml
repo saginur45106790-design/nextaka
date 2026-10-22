@@ -1,0 +1,151 @@
+# OPTIONAL PAID infrastructure. Review the Render cost estimate before applying.
+# This is an alternative to render.yaml, not a second simultaneous deployment.
+# Paid infrastructure alone does not authorize financial launch: gates stay false.
+services:
+  - type: web
+    name: nextaka-api
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm install --include=dev && npm run build --workspace backend
+    preDeployCommand: npm run db:migrate --workspace backend && npm run db:seed --workspace backend
+    startCommand: npm run start --workspace backend
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATABASE_URL
+        sync: false
+      - key: MIGRATION_DATABASE_URL
+        fromDatabase:
+          name: nextaka-db
+          property: connectionString
+      - key: FRONTEND_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: IP_HASH_SECRET
+        generateValue: true
+      - key: TURNSTILE_SITE_KEY
+        sync: false
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
+      - key: TURNSTILE_HOSTNAMES
+        sync: false
+      - key: EMAIL_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: SUPPORT_EMAIL
+        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: AUTH_TEST_BYPASS
+        value: "false"
+      - key: FINANCIAL_ACTIVITY_ENABLED
+        value: "false"
+      - key: DURABLE_INFRASTRUCTURE_CONFIRMED
+        value: "false"
+      - key: COMPLIANCE_APPROVED
+        value: "false"
+      - key: PAYMENT_OPERATIONS_READY
+        value: "false"
+      - key: BACKUPS_RESTORE_TESTED
+        value: "false"
+      - key: SECURITY_REVIEW_APPROVED
+        value: "false"
+  - type: cron
+    name: nextaka-settlement
+    runtime: node
+    plan: starter
+    region: singapore
+    schedule: "*/15 * * * *"
+    buildCommand: npm install --include=dev && npm run build --workspace backend
+    startCommand: npm run settle:production --workspace backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATABASE_URL
+        sync: false
+      - key: MIGRATION_DATABASE_URL
+        fromDatabase:
+          name: nextaka-db
+          property: connectionString
+      - key: FRONTEND_URL
+        fromService:
+          name: nextaka-api
+          type: web
+          envVarKey: FRONTEND_URL
+      - key: SESSION_SECRET
+        fromService:
+          name: nextaka-api
+          type: web
+          envVarKey: SESSION_SECRET
+      - key: IP_HASH_SECRET
+        fromService:
+          name: nextaka-api
+          type: web
+          envVarKey: IP_HASH_SECRET
+      - key: FINANCIAL_ACTIVITY_ENABLED
+        value: "false"
+      - key: DURABLE_INFRASTRUCTURE_CONFIRMED
+        value: "false"
+      - key: COMPLIANCE_APPROVED
+        value: "false"
+      - key: PAYMENT_OPERATIONS_READY
+        value: "false"
+      - key: BACKUPS_RESTORE_TESTED
+        value: "false"
+      - key: SECURITY_REVIEW_APPROVED
+        value: "false"
+  - type: web
+    name: nextaka
+    runtime: static
+    buildCommand: npm install --include=dev && npm run build --workspace frontend
+    staticPublishPath: frontend/dist
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_TURNSTILE_SITE_KEY
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=(), payment=()
+      - path: /*
+        name: Content-Security-Policy
+        # Add your exact custom API origin here before switching from onrender.com.
+        value: "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.onrender.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+databases:
+  - name: nextaka-db
+    databaseName: nextaka
+    user: nextaka_owner
+    plan: basic-1gb
+    region: singapore
+    postgresMajorVersion: "17"
+    diskSizeGB: 15
+    ipAllowList: []

@@ -1,0 +1,22 @@
+{
+  "name": "nextaka",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces",
+    "test:integration": "npm run test:integration --workspace backend",
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "check:source": "python3 scripts/check-source.py"
+  }
+}
