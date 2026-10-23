@@ -1,0 +1,57 @@
+{
+  "name": "@nextaka/backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "lint": "eslint src tests prisma",
+    "test": "vitest run --project unit",
+    "db:generate": "prisma generate",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:seed": "tsx prisma/seed.ts",
+    "admin:create": "tsx src/bootstrap-admin.ts",
+    "settle": "tsx src/settle.ts",
+    "typecheck": "prisma generate && tsc --noEmit",
+    "test:integration": "vitest run --project integration",
+    "test:all": "vitest run",
+    "maintenance": "tsx src/maintenance.ts",
+    "audit:dependencies": "npm audit --omit=dev --audit-level=high",
+    "settle:production": "node dist/settle.js"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "pino": "^9.14.0",
+    "zod": "^4.1.12",
+    "argon2": "^0.44.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.18.0",
+    "@types/supertest": "^6.0.3",
+    "prisma": "6.19.0",
+    "supertest": "^7.1.4",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.3",
+    "eslint": "^9.39.0",
+    "@eslint/js": "^9.39.0",
+    "typescript-eslint": "^8.46.2",
+    "globals": "^16.4.0"
+  }
+}
