@@ -1,0 +1,55 @@
+name: NEXTAKA checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: nextaka_test
+          POSTGRES_USER: nextaka_test
+          POSTGRES_PASSWORD: ephemeral_ci_only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nextaka_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://nextaka_test:ephemeral_ci_only@localhost:5432/nextaka_test
+      TEST_DATABASE_URL: postgresql://nextaka_test:ephemeral_ci_only@localhost:5432/nextaka_test
+      NODE_ENV: test
+      SESSION_SECRET: automated-ci-only-session-secret-not-production
+      IP_HASH_SECRET: automated-ci-only-ip-hash-secret-not-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --include=dev
+      - run: npm run check:source
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run test:e2e --workspace frontend
+      - name: Save dependency lock for review and commit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextaka-dependency-lock
+          path: package-lock.json
+      - name: Browser traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-traces
+          path: frontend/test-results
