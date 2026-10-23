@@ -10,7 +10,8 @@ import { requireAuth, rateLimit, event } from './security.js';
 
 export const publicRouter = Router();
 export const userRouter = Router();
-const asObject = (value: Prisma.JsonValue | undefined): Record<string, Prisma.JsonValue> => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+const asObject = (value: Prisma.JsonValue | undefined): Prisma.JsonObject =>
+  value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {};
 export function pagination(query: Record<string, unknown>) {
   const page = z.coerce.number().int().min(1).max(100000).catch(1).parse(query.page);
   const pageSize = z.coerce.number().int().min(1).max(50).catch(20).parse(query.pageSize);
