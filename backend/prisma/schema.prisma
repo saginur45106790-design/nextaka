@@ -1,0 +1,466 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String   @id @default(uuid()) @db.Uuid
+  email                   String   @unique
+  fullName                String
+  phone                   String?
+  verifiedPhone           String?  @unique
+  passwordHash            String
+  emailVerifiedAt         DateTime?
+  phoneVerifiedAt         DateTime?
+  role                    String   @default("USER")
+  status                  String   @default("ACTIVE")
+  referralCode            String   @unique
+  language                String   @default("bn")
+  notificationPreferences Json     @default("{}")
+  termsAcceptedAt         DateTime
+  deletionRequestedAt     DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  sessions                Session[]
+  authTokens              AuthToken[]
+  securityEvents          SecurityEvent[]
+  wallets                 WalletAccount[]
+  contracts               MachineContract[]
+  deposits                DepositRequest[]
+  withdrawals             WithdrawalRequest[]
+  referralsSent           ReferralRelationship[] @relation("Referrer")
+  referralReceived        ReferralRelationship? @relation("Referred")
+  commissions             ReferralCommission[]
+  promotions              PromotionalCredit[]
+  notifications           Notification[]
+  supportTickets          SupportTicket[]
+  riskFlags               RiskFlag[]
+  contacts                VerifiedContact[]
+  termsAcceptances        TermsAcceptance[]
+  @@index([status, createdAt])
+}
+
+model Session {
+  id          String   @id @default(uuid()) @db.Uuid
+  tokenHash   String   @unique
+  userId      String   @db.Uuid
+  csrfHash    String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  ipHash      String?
+  userAgent   String?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+}
+model AuthToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tokenHash String   @unique
+  kind      String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([expiresAt])
+}
+model RateLimit {
+  key       String   @id
+  count     Int      @default(0)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model VerifiedContact {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  kind       String
+  value      String
+  verifiedAt DateTime @default(now())
+  provider   String
+  user       User     @relation(fields: [userId], references: [id])
+  @@unique([kind,value])
+}
+model TermsAcceptance {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @db.Uuid
+  version   String
+  createdAt DateTime @default(now())
+  user      User @relation(fields:[userId],references:[id])
+  @@unique([userId,version])
+}
+model SecurityEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  type      String
+  ipHash    String?
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+  @@index([userId,createdAt])
+  @@index([type,createdAt])
+}
+model RiskFlag {
+  id         String @id @default(uuid()) @db.Uuid
+  userId     String @db.Uuid
+  type       String
+  reason     String
+  status     String @default("OPEN")
+  reviewedBy String?
+  reviewNote String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User @relation(fields:[userId],references:[id])
+  @@index([status,createdAt])
+}
+model WalletAccount {
+  id           String @id @default(uuid()) @db.Uuid
+  userId       String @db.Uuid
+  kind         String
+  balanceMinor BigInt @default(0)
+  createdAt    DateTime @default(now())
+  user         User @relation(fields:[userId],references:[id])
+  ledger       WalletLedger[]
+  @@unique([userId,kind])
+}
+model WalletLedger {
+  id           String @id @default(uuid()) @db.Uuid
+  accountId    String @db.Uuid
+  amountMinor  BigInt
+  balanceAfter BigInt @default(0)
+  eventKey     String @unique
+  kind         String
+  referenceId  String
+  description  String
+  actorId      String? @db.Uuid
+  reversalOfId String? @unique @db.Uuid
+  createdAt    DateTime @default(now())
+  account      WalletAccount @relation(fields:[accountId],references:[id])
+  reversalOf   WalletLedger? @relation("LedgerReversal",fields:[reversalOfId],references:[id])
+  reversal     WalletLedger? @relation("LedgerReversal")
+  @@index([accountId,createdAt])
+  @@index([kind,createdAt])
+}
+model WalletReservation {
+  id                  String @id @default(uuid()) @db.Uuid
+  withdrawalRequestId String @unique @db.Uuid
+  amountMinor         BigInt
+  status              String @default("HELD")
+  createdAt           DateTime @default(now())
+  releasedAt          DateTime?
+  withdrawal          WithdrawalRequest @relation(fields:[withdrawalRequestId],references:[id])
+}
+model MachinePlan {
+  id                  String @id
+  name                String
+  priceMinor          BigInt
+  durationDays        Int
+  dailyTargetMinor    BigInt
+  totalTargetMinor    BigInt
+  enabled             Boolean @default(false)
+  operationId         String? @db.Uuid
+  specifications      Json @default("{}")
+  updatedAt           DateTime @updatedAt
+  operation           MiningOperation? @relation(fields:[operationId],references:[id])
+  contracts           MachineContract[]
+}
+model MiningOperation {
+  id                  String @id @default(uuid()) @db.Uuid
+  reference           String @unique
+  providerReference   String
+  description         String
+  arrangementEvidence String
+  status              String @default("PENDING")
+  createdById         String @db.Uuid
+  verifiedById        String? @db.Uuid
+  verifiedAt          DateTime?
+  createdAt           DateTime @default(now())
+  plans               MachinePlan[]
+  contracts           MachineContract[]
+  revenues            MiningRevenue[]
+}
+model MachineContract {
+  id                 String @id @default(uuid()) @db.Uuid
+  userId             String @db.Uuid
+  planId             String
+  operationId        String @db.Uuid
+  priceMinor         BigInt
+  dailyTargetMinor   BigInt
+  totalTargetMinor   BigInt
+  durationDays       Int
+  status             String @default("ACTIVE")
+  startsAt           DateTime @default(now())
+  endsAt             DateTime
+  createdAt          DateTime @default(now())
+  user               User @relation(fields:[userId],references:[id])
+  plan               MachinePlan @relation(fields:[planId],references:[id])
+  operation          MiningOperation @relation(fields:[operationId],references:[id])
+  allocations        RewardAllocation[]
+  settlements        MiningSettlement[]
+  @@index([userId,status])
+  @@index([status,endsAt])
+}
+model PayoutReserve {
+  id                 String @id @default(uuid()) @db.Uuid
+  purpose            String
+  sourceReference    String @unique
+  sourceType         String
+  evidence           String
+  fundedMinor        BigInt
+  availableMinor     BigInt
+  status             String @default("PENDING")
+  createdById        String @db.Uuid
+  verifiedById       String? @db.Uuid
+  verifiedAt         DateTime?
+  createdAt          DateTime @default(now())
+  allocations        RewardAllocation[]
+  commissions        ReferralCommission[]
+  promotions         PromotionalCredit[]
+}
+model MiningRevenue {
+  id                   String @id @default(uuid()) @db.Uuid
+  operationId          String @db.Uuid
+  reference            String @unique
+  grossMinor           BigInt
+  operatingCostMinor   BigInt
+  netMinor             BigInt
+  allocatedMinor       BigInt @default(0)
+  periodStartsAt       DateTime
+  periodEndsAt         DateTime
+  evidence             String
+  status               String @default("PENDING")
+  createdById          String @db.Uuid
+  verifiedAt           DateTime?
+  createdAt            DateTime @default(now())
+  operation            MiningOperation @relation(fields:[operationId],references:[id])
+  verifications        RevenueVerification[]
+  allocations          RewardAllocation[]
+  @@index([operationId,status])
+}
+model RevenueVerification {
+  id          String @id @default(uuid()) @db.Uuid
+  revenueId   String @unique @db.Uuid
+  verifiedById String @db.Uuid
+  evidence    String
+  statementReference String @unique
+  verifiedAt  DateTime @default(now())
+  revenue     MiningRevenue @relation(fields:[revenueId],references:[id])
+}
+model RewardAllocation {
+  id           String @id @default(uuid()) @db.Uuid
+  contractId   String @db.Uuid
+  revenueId    String @db.Uuid
+  reserveId    String @db.Uuid
+  period       Int
+  amountMinor  BigInt
+  status       String @default("APPROVED")
+  approvedById String @db.Uuid
+  createdAt    DateTime @default(now())
+  contract     MachineContract @relation(fields:[contractId],references:[id])
+  revenue      MiningRevenue @relation(fields:[revenueId],references:[id])
+  reserve      PayoutReserve @relation(fields:[reserveId],references:[id])
+  settlement   MiningSettlement?
+  @@unique([contractId,period])
+  @@index([status,createdAt])
+}
+model MiningSettlement {
+  id           String @id @default(uuid()) @db.Uuid
+  contractId   String @db.Uuid
+  allocationId String @unique @db.Uuid
+  period       Int
+  amountMinor  BigInt
+  settledAt    DateTime @default(now())
+  contract     MachineContract @relation(fields:[contractId],references:[id])
+  allocation   RewardAllocation @relation(fields:[allocationId],references:[id])
+  @@unique([contractId,period])
+}
+model DepositRequest {
+  id              String @id @default(uuid()) @db.Uuid
+  userId          String @db.Uuid
+  provider        String
+  amountMinor     BigInt
+  reference       String
+  senderAccount   String
+  status          String @default("PENDING")
+  rejectionReason String?
+  reviewedById    String? @db.Uuid
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+  user            User @relation(fields:[userId],references:[id])
+  verification    PaymentVerification?
+  histories       DepositHistory[]
+  @@unique([provider,reference])
+  @@index([userId,createdAt])
+  @@index([status,createdAt])
+}
+model PaymentVerification {
+  id                  String @id @default(uuid()) @db.Uuid
+  depositId           String @unique @db.Uuid
+  provider            String
+  settlementReference String
+  amountMinor         BigInt
+  evidence            String
+  verifiedById        String @db.Uuid
+  providerConfirmedAt DateTime
+  createdAt           DateTime @default(now())
+  deposit             DepositRequest @relation(fields:[depositId],references:[id])
+  @@unique([provider,settlementReference])
+}
+model DepositHistory {
+  id        String @id @default(uuid()) @db.Uuid
+  depositId String @db.Uuid
+  status    String
+  note      String
+  actorId   String @db.Uuid
+  createdAt DateTime @default(now())
+  deposit   DepositRequest @relation(fields:[depositId],references:[id])
+}
+model WithdrawalRequest {
+  id               String @id @default(uuid()) @db.Uuid
+  userId           String @db.Uuid
+  provider         String
+  amountMinor      BigInt
+  feeMinor         BigInt
+  recipientAccount String
+  recipientName    String
+  status           String @default("REQUESTED")
+  rejectionReason  String?
+  reviewedById     String? @db.Uuid
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User @relation(fields:[userId],references:[id])
+  reservation      WalletReservation?
+  settlement       WithdrawalSettlement?
+  histories        WithdrawalHistory[]
+  @@index([userId,createdAt])
+  @@index([status,createdAt])
+}
+model WithdrawalSettlement {
+  id                  String @id @default(uuid()) @db.Uuid
+  withdrawalId        String @unique @db.Uuid
+  provider            String
+  settlementReference String
+  evidence            String
+  settledById         String @db.Uuid
+  settledAt           DateTime
+  createdAt           DateTime @default(now())
+  withdrawal          WithdrawalRequest @relation(fields:[withdrawalId],references:[id])
+  @@unique([provider,settlementReference])
+}
+model WithdrawalHistory {
+  id           String @id @default(uuid()) @db.Uuid
+  withdrawalId String @db.Uuid
+  status       String
+  note         String
+  actorId      String @db.Uuid
+  createdAt    DateTime @default(now())
+  withdrawal   WithdrawalRequest @relation(fields:[withdrawalId],references:[id])
+}
+model ReferralRelationship {
+  id          String @id @default(uuid()) @db.Uuid
+  referrerId  String @db.Uuid
+  referredId  String @unique @db.Uuid
+  status      String @default("PENDING")
+  createdAt   DateTime @default(now())
+  referrer    User @relation("Referrer",fields:[referrerId],references:[id])
+  referred    User @relation("Referred",fields:[referredId],references:[id])
+  commission  ReferralCommission?
+}
+model ReferralCommission {
+  id             String @id @default(uuid()) @db.Uuid
+  relationshipId String @unique @db.Uuid
+  userId         String @db.Uuid
+  reserveId      String @db.Uuid
+  amountMinor    BigInt
+  qualifyingDepositId String @unique @db.Uuid
+  status         String @default("APPROVED")
+  reviewNote     String
+  reviewedById   String @db.Uuid
+  createdAt      DateTime @default(now())
+  relationship   ReferralRelationship @relation(fields:[relationshipId],references:[id])
+  user           User @relation(fields:[userId],references:[id])
+  reserve        PayoutReserve @relation(fields:[reserveId],references:[id])
+}
+model PromotionalCredit {
+  id           String @id @default(uuid()) @db.Uuid
+  userId       String @db.Uuid
+  campaign     String
+  reserveId    String @db.Uuid
+  amountMinor  BigInt
+  reviewedById String @db.Uuid
+  createdAt    DateTime @default(now())
+  user         User @relation(fields:[userId],references:[id])
+  reserve      PayoutReserve @relation(fields:[reserveId],references:[id])
+  @@unique([userId,campaign])
+}
+model Notification {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @db.Uuid
+  title     String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User @relation(fields:[userId],references:[id])
+  @@index([userId,createdAt])
+}
+model SupportTicket {
+  id          String @id @default(uuid()) @db.Uuid
+  userId      String @db.Uuid
+  subject     String
+  message     String
+  status      String @default("OPEN")
+  adminReply  String?
+  repliedById String? @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User @relation(fields:[userId],references:[id])
+  @@index([userId,createdAt])
+}
+model Announcement {
+  id        String @id @default(uuid()) @db.Uuid
+  title     String
+  message   String
+  published Boolean @default(false)
+  createdById String @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model SiteSetting {
+  key       String @id
+  value     Json
+  updatedById String? @db.Uuid
+  updatedAt DateTime @updatedAt
+}
+model AuditLog {
+  id         String @id @default(uuid()) @db.Uuid
+  actorId    String? @db.Uuid
+  action     String
+  targetType String
+  targetId   String?
+  metadata   Json @default("{}")
+  createdAt  DateTime @default(now())
+  @@index([action,createdAt])
+  @@index([actorId,createdAt])
+}
+model ReconciliationRun {
+  id         String @id @default(uuid()) @db.Uuid
+  status     String
+  findings   Json
+  createdById String? @db.Uuid
+  createdAt  DateTime @default(now())
+}
+model IdempotencyKey {
+  id           String @id @default(uuid()) @db.Uuid
+  actorId      String @db.Uuid
+  key          String
+  operation    String
+  requestHash  String
+  response     Json
+  createdAt    DateTime @default(now())
+  @@unique([actorId,key])
+  @@index([createdAt])
+}
