@@ -1,0 +1,26 @@
+import { useState, useId } from 'react';
+import { motion } from 'motion/react';
+import { ArrowUpRight, Clock3, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { money, post } from '../lib/api';
+import type { Plan } from '../lib/types';
+import { useLanguage } from '../lib/i18n';
+import { useAuth } from '../lib/auth';
+import { Confirm, useConfig } from './UI';
+
+export function MiningRig({variant=0,large=false,active=false}:{variant?:number;large?:boolean;active?:boolean}){
+  const gradientId=useId();
+  const fans=variant===0?2:variant===4?4:3;
+  return <div className={`mining-rig rig-${variant} ${large?'large':''} ${active?'running':''}`} aria-label={`Industrial mining machine ${variant+1} illustration`} role="img"><div className="rig-floor"/><div className="rig-shell"><div className="rig-top"><span>NXT / {String(variant+1).padStart(2,'0')}</span><span className="rig-vents">||||||||||||</span></div><div className="rig-face"><div className="rig-brand">NEXTAKA <span>COMPUTE UNIT</span></div><div className="rig-fans">{Array.from({length:fans},(_,i)=><div className="fan-housing" key={i}><svg className="fan" viewBox="0 0 100 100" aria-hidden="true" style={{animationDelay:`-${i*1.2}s`}}><circle cx="50" cy="50" r="44" fill="#101e1c" stroke="#51635e" strokeWidth="1"/>{Array.from({length:7},(_,j)=><path key={j} d="M49 43C28 8 69 1 65 30L57 47Z" fill={`url(#${gradientId}-${i})`} transform={`rotate(${j*360/7} 50 50)`}/>)}<defs><linearGradient id={`${gradientId}-${i}`}><stop stopColor="#43554e"/><stop offset="1" stopColor="#182b24"/></linearGradient></defs><circle cx="50" cy="50" r="11" fill="#14281e" stroke="#638271"/><circle cx="50" cy="50" r="5" fill="#72efac"/></svg><i/><i/><i/><i/></div>)}</div><div className="rig-base"><div className="rig-leds"><i/><i/><i/></div><div className="rig-slots">▰ ▰ ▰ ▰ ▰</div><span>{active?'ONLINE':'STANDBY'}</span></div></div><div className="rig-side"/><div className="rig-feet"><i/><i/></div></div>{large&&<><div className="rig-orbit orbit-one"/><div className="rig-orbit orbit-two"/><div className="rig-label"><span className="status-dot"/> ILLUSTRATION / VERIFICATION REQUIRED</div></>}</div>;
+}
+
+export function MachineCard({plan,index=0}:{plan:Plan;index?:number}){
+  const {t}=useLanguage();const {user}=useAuth();const config=useConfig();const navigate=useNavigate();const client=useQueryClient();
+  const [open,setOpen]=useState(false);const [key,setKey]=useState(()=>crypto.randomUUID());
+  const buy=useMutation({mutationFn:()=>post('/contracts/purchase',{planId:plan.id},key),onSuccess:()=>{setOpen(false);setKey(crypto.randomUUID());toast.success(t('মেশিনের চুক্তি তৈরি হয়েছে।','Machine contract created.'));void client.invalidateQueries({queryKey:['dashboard']});void client.invalidateQueries({queryKey:['contracts']});},onError:e=>toast.error(e.message)});
+  const enabled=config.data?.financialEnabled&&plan.enabled;
+  const gain=(BigInt(plan.totalTargetMinor)-BigInt(plan.priceMinor)).toString();
+  return <motion.article className="machine-card glass" initial={{opacity:0,y:16}} whileInView={{opacity:1,y:0}} viewport={{once:true,amount:.1}} transition={{delay:index*.045,duration:.3}}><div className="machine-card-top"><span className="machine-index">UNIT / {String(index+1).padStart(2,'0')}</span><span className="badge neutral">{enabled?t('উপলব্ধ','Available'):t('প্রি-লঞ্চ','Pre-launch')}</span></div><MiningRig variant={index}/><div className="machine-info"><h3>{plan.name}</h3><p>{t('স্বচ্ছ হিসাব • যাচাইকৃত বিতরণ','Transparent accounting • verified distributions')}</p><div className="machine-price">{money(plan.priceMinor)}<span><Clock3 size={13}/>{plan.durationDays} {t('দিন','days')}</span></div><dl className="machine-specs"><div><dt>{t('দৈনিক লক্ষ্য','Daily target')}</dt><dd>{money(plan.dailyTargetMinor)}</dd></div><div><dt>{t('মোট বিতরণ লক্ষ্য','Total distribution target')}</dt><dd>{money(plan.totalTargetMinor)}</dd></div><div><dt>{t('লক্ষ্যমাত্রার নিট লাভ','Target net gain')}</dt><dd className="accent">{money(gain)}</dd></div></dl><p className="risk-note">{t('লক্ষ্যমাত্রা, নিশ্চিত আয় নয়। মোট লক্ষ্যের মধ্যেই ক্রয়মূল্য অন্তর্ভুক্ত।','Targets, not guaranteed earnings. Total target includes the purchase amount.')}</p><button className={`button ${index===2?'':'secondary'}`} disabled={!enabled} onClick={()=>user?setOpen(true):navigate('/login')}>{enabled?t('মেশিন কিনুন','Purchase machine'):t('চালুর অপেক্ষায়','Awaiting launch')}<ArrowUpRight size={17}/></button></div><Confirm open={open} onClose={()=>setOpen(false)} title={t('চুক্তি নিশ্চিত করুন','Confirm contract')} onConfirm={()=>buy.mutate()} pending={buy.isPending}><p>{plan.name} — {money(plan.priceMinor)}</p><p>{t('ক্রয়মূল্য মূল ব্যালেন্স থেকে কাটা হবে। আয় কেবল যাচাইকৃত mining revenue ও পর্যাপ্ত reserve থেকে বিতরণ করা হবে; লক্ষ্য পূরণ নাও হতে পারে।','The purchase price will be deducted from your main cash balance. Distributions require verified mining revenue and adequate reserves; targets might not be reached.')}</p><p><ShieldCheck size={16}/> {t('ঝুঁকি বিবরণ ও শর্তাবলি পড়ুন।','Read the risk disclosure and terms before continuing.')}</p></Confirm></motion.article>;
+}

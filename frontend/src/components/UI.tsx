@@ -1,0 +1,25 @@
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { AlertCircle, ArrowUpRight, Check, ChevronRight, ShieldCheck, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../lib/api';
+import type { PublicConfig } from '../lib/types';
+import { useLanguage } from '../lib/i18n';
+
+export const useConfig=()=>useQuery({queryKey:['config'],queryFn:()=>api<PublicConfig>('/public/config'),staleTime:60000,retry:1});
+export function Logo(){return <Link to="/" className="logo" aria-label="NEXTAKA home"><span className="logo-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 25V7h5l10 12V7h5v18h-5L11 13v12z" fill="currentColor"/></svg></span><span>NEXTAKA<span className="logo-dot">.</span></span></Link>;}
+export function LanguageSwitch(){const {language,setLanguage}=useLanguage();return <button className="language-switch" onClick={()=>setLanguage(language==='bn'?'en':'bn')} aria-label="Change language"><span className={language==='bn'?'selected':''}>বাংলা</span><span className={language==='en'?'selected':''}>EN</span></button>;}
+export function Status({value}:{value:string}){const s=value.toLowerCase();return <span className={`badge ${/active|approved|paid|verified|credited|completed/.test(s)?'success':/reject|cancel|suspend|fail/.test(s)?'danger':'neutral'}`}><span className="status-dot"/>{value.replaceAll('_',' ')}</span>;}
+export function ErrorState({error,retry}:{error:unknown;retry?:()=>void}){const {t}=useLanguage();return <div className="error-state" role="alert"><AlertCircle size={25}/><div><strong>{t('তথ্য লোড করা যায়নি','Unable to load data')}</strong><p>{error instanceof Error?error.message:t('আবার চেষ্টা করুন।','Please try again.')}</p>{retry&&<button className="text-button" onClick={retry}>{t('আবার চেষ্টা করুন','Try again')} <ArrowUpRight size={15}/></button>}</div></div>;}
+export function Skeleton({lines=3}:{lines?:number}){return <div className="skeleton-wrap" aria-label="Loading" role="status">{Array.from({length:lines},(_,i)=><div className="skeleton" key={i} style={{width:`${100-i%3*12}%`}}/>)}</div>;}
+export function Empty({title,children,icon}:{title:string;children?:ReactNode;icon?:ReactNode}){return <div className="empty-state"><div className="empty-icon">{icon??<ShieldCheck size={26}/>}</div><h3>{title}</h3>{children&&<p>{children}</p>}</div>;}
+export function Heading({eyebrow,title,description,action}:{eyebrow?:string;title:string;description?:string;action?:ReactNode}){return <div className="page-heading"><div>{eyebrow&&<span className="eyebrow">{eyebrow}</span>}<h1>{title}</h1>{description&&<p>{description}</p>}</div>{action}</div>;}
+export function SectionHeader({title,subtitle,to,link}:{title:string;subtitle?:string;to?:string;link?:string}){return <div className="section-heading"><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div>{to&&<Link className="text-button" to={to}>{link??'View all'}<ChevronRight size={16}/></Link>}</div>;}
+export function PrelaunchBanner(){const {data}=useConfig();const {t}=useLanguage();if(data?.financialEnabled)return null;return <div className="prelaunch-banner"><span className="status-dot"/><div><strong>{t('প্রি-লঞ্চ','Pre-launch')}</strong><span>{t('যাচাইকৃত operations প্রস্তুত না হওয়া পর্যন্ত আর্থিক কার্যক্রম বন্ধ।','Financial activity is paused until verified operations are ready.')}</span></div><Link to="/legal/risk">{t('বিস্তারিত','Details')} <ArrowUpRight size={14}/></Link></div>;}
+export function Confirm({open,title,children,onClose,onConfirm,pending=false}:{open:boolean;title:string;children:ReactNode;onClose:()=>void;onConfirm:()=>void;pending?:boolean}){
+  const ref=useRef<HTMLDialogElement>(null);const {t}=useLanguage();
+  useEffect(()=>{if(open&&!ref.current?.open)ref.current?.showModal();else if(!open&&ref.current?.open)ref.current.close();},[open]);
+  return <dialog ref={ref} className="modal" onCancel={e=>{e.preventDefault();if(!pending)onClose();}}><div className="modal-header"><h2>{title}</h2><button className="icon-button" aria-label="Close" onClick={onClose} disabled={pending}><X size={20}/></button></div><div className="modal-body">{children}</div><div className="modal-actions"><button className="button secondary" disabled={pending} onClick={onClose}>{t('ফিরে যান','Cancel')}</button><button className="button" onClick={onConfirm} disabled={pending}>{pending?t('অপেক্ষা করুন…','Please wait…'):t('নিশ্চিত করুন','Confirm')}<Check size={16}/></button></div></dialog>;
+}
+export function OfflineBanner(){const [online,setOnline]=useState(navigator.onLine);const {t}=useLanguage();useEffect(()=>{const update=()=>setOnline(navigator.onLine);window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);return online?null:<div role="status" className="offline-banner">{t('আপনি অফলাইন। সংযোগ ফিরে এলে আবার চেষ্টা করুন।','You are offline. Reconnect before submitting requests.')}</div>;}
