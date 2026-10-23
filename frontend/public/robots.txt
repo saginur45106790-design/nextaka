@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /profile
+Disallow: /wallet
+Disallow: /transactions
+Disallow: /referrals
+Disallow: /notifications
