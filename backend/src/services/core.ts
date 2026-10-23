@@ -50,7 +50,7 @@ export async function financialStatus(db: Db = prisma) {
 export async function gate(tx: Tx, activity: string) {
   const status = await financialStatus(tx);
   if (!status.financialEnabled) throw new AppError(423, 'PRELAUNCH', 'Real-money activity is disabled until infrastructure, funding, payment and legal reviews are complete.');
-  const platform = await setting(tx, 'platform', {});
+  const platform = await setting<JsonObject>(tx, 'platform', {});
   const operations = await tx.miningOperation.count({ where: {status: 'VERIFIED'} });
   const revenue = await tx.miningRevenue.count({ where: {status: 'VERIFIED', operation: {status: 'VERIFIED'}} });
   const reserve = await tx.payoutReserve.count({ where: {status: 'VERIFIED', purpose: 'MINING', availableMinor: {gt: 0n}} });
@@ -112,7 +112,7 @@ export async function post(tx: Tx, userId: string, accountKind: string, amountMi
 }
 export async function paymentReady(tx: Tx, provider: string) {
   if (!['BKASH', 'NAGAD'].includes(provider)) throw new AppError(400, 'INVALID_PROVIDER', 'Unsupported payment provider.');
-  const payments = await setting(tx, 'payments', {});
+  const payments = await setting<JsonObject>(tx, 'payments', {});
   const method = payments[provider.toLowerCase()] as JsonObject | undefined;
   if (method?.enabled !== true || !method.merchantAccount || !method.instructions) throw new AppError(423, 'PROVIDER_NOT_CONFIGURED', 'This payment method is not configured.');
 }
