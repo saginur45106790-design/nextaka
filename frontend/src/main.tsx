@@ -1,0 +1,15 @@
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MotionConfig } from 'motion/react';
+import { Toaster } from 'sonner';
+import '@fontsource-variable/manrope';
+import '@fontsource-variable/noto-sans-bengali';
+import { AuthProvider } from './lib/auth';
+import { LanguageProvider } from './lib/i18n';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import App from './App';
+import './styles.css';
+const client = new QueryClient({defaultOptions:{queries:{retry:1,staleTime:30000,refetchOnWindowFocus:false},mutations:{retry:false}}});
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><ErrorBoundary><BrowserRouter><QueryClientProvider client={client}><LanguageProvider><MotionConfig reducedMotion="user"><AuthProvider><App/><Toaster theme="dark" richColors position="top-center"/></AuthProvider></MotionConfig></LanguageProvider></QueryClientProvider></BrowserRouter></ErrorBoundary></React.StrictMode>);
